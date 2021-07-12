@@ -1,0 +1,99 @@
+library(caret)
+library(tidyverse)
+
+data("iris")
+iris <- iris[-which(iris$Species == 'setosa'), ]
+y <- iris$Species
+
+## Create evenly partitioned data
+set.seed(2)
+test_index <- createDataPartition(y, times = 1, p = .5, list = FALSE)
+test <- iris[test_index, ]
+train <- iris[-test_index, ]
+
+## Assess overall accuracy for the features and find 
+## the one feature that has the highest overall accuracy
+## My solution:
+features <- colnames(train)[-5]
+structure(map(features, function(x) {
+  dat <- train %>%
+    group_by(Species) %>%
+    summarise(average = mean(Sepal.Length), sd = sd(Sepal.Length))
+  ind_chosen <- which.max(dat$average)
+  av <- dat$average[ind_chosen]
+  sd <- dat$sd[ind_chosen]
+  y_hat <- ifelse(train[[x]] > (av - (2 * sd)), "virginica", "versicolor")
+  mean(y_hat == train$Species)
+}), names = features)
+
+## Given solution (with modifications to enable plotting)
+foo <- function(x) {
+  rangedValues <- seq(range(x)[1], range(x)[2], by = 0.1)
+  acc <- sapply(rangedValues, function(i) {
+    y_hat <- ifelse(x > i, 'virginica', 'versicolor')
+    mean(y_hat == train$Species)
+  })
+  print(qplot(rangedValues, acc, geom = c('line', 'point')))
+  acc
+}
+predictions <- apply(train[ , -5], 2, foo)
+sapply(predictions, max)
+
+
+## Overall accuracy for the test data
+values <- seq(range(train$Petal.Length)[1], range(train$Petal.Length)[2], by = 0.1)
+smart_cutoff <- values[which.max(predictions$Petal.Length)]
+smart_cutoff
+
+y_hat <- ifelse(test$Petal.Length > smart_cutoff, "virginica", "versicolor")
+mean(y_hat == test$Species)
+
+## Check to see which feature will optimize our predictions, using the test data
+predictions_w <- apply(test[ , -5], 2, foo)
+sapply(predictions, max)
+
+## Check overall accuracy using a combination of petal length and petal width
+values_w <- seq(range(train$Petal.Width)[1], range(train$Petal.Width)[2], by = 0.1)
+smart_cutoff_w <- values_w[which.max(predictions_w$Petal.Width)]
+smart_cutoff_w
+
+y_hat <- ifelse(
+  (test$Petal.Length > smart_cutoff | test$Petal.Width > smart_cutoff_w),
+  'virginica',
+  'versicolor'
+)
+mean(y_hat == test$Species)
+
+## Correct result obtained but here is the given solution for the exercise
+## Note that it starts afresh, but this is totally unnecessary
+data('iris')
+iris <- iris[-which(iris$Species == 'setosa'), ]
+y <- iris$Species
+
+plot(iris, pch = 21, bg = iris$Species)
+
+set.seed(2)
+test_index <- createDataPartition(y, times = 1, p = 0.5, list = FALSE)
+test <- iris[test_index, ]
+train <- iris[-test_index, ]
+
+petalLengthRange <-
+  seq(range(train[, 3])[1], range(train[, 3])[2], by = 0.1)
+petalWidthRange <-
+  seq(range(train[, 4])[1], range(train[, 4])[2], by = 0.1)
+cutoffs <- expand.grid(petalLengthRange, petalWidthRange)
+
+id <- sapply(seq(nrow(cutoffs)), function(i) {
+  y_hat <-
+    ifelse(train[, 3] > cutoffs[i, 1] |
+             train[, 4] > cutoffs[i, 2], 'virginica', 'versicolor')
+  mean(y_hat == train$Species)
+}) %>% which.max
+
+optimalCutoff <- cutoffs[id, ] %>% as.numeric
+y_hat <-
+  ifelse(test[, 3] > optimalCutoff[1] &
+           test[, 4] > optimalCutoff[2],
+         'virginica',
+         'versicolor')
+mean(y_hat == test$Species)
