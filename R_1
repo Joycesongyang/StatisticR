@@ -1,0 +1,55 @@
+
+library(dslabs)
+library(dplyr)
+library(lubridate)
+library(caret)
+
+data("reported_heights")
+
+dat <-
+  mutate(reported_heights, date_time = ymd_hms(time_stamp)) %>%
+  filter(date_time >= make_date(2016, 01, 25) &
+           date_time < make_date(2016, 02, 1)) %>%
+  mutate(type = ifelse(
+    day(date_time) == 25 &
+      hour(date_time) == 8 &
+      between(minute(date_time), 15, 30),
+    'inclass',
+    'online'
+  )) %>%
+  select(sex, type)
+
+y <- factor(dat$sex, c("Female", "Male"))
+x <- factor(dat$type)
+
+## Solution code
+dat %>% group_by(type) %>% summarise(prop_female = mean(sex == 'Female'))
+
+
+## Explore the data a little
+dat %>% 
+  group_by(type) %>% 
+  summarise(Av.Male = mean(sex == "Male"), Av.Female = mean(sex == "Female"))
+
+## Guessing
+y_hat <- sample(c("Male", "Female"), length(index), replace = TRUE) %>% 
+  factor(levels = levels(y))
+mean(y_hat == y)
+
+## Overall Accuracy
+y_hat <- ifelse(train$type == 'online', 'Male', 'Female') %>% 
+  factor(levels = levels(y))
+mean(y_hat == y)
+
+## use 'table()' to creae a confusion matrix
+table(predicted = y_hat, actual = y)
+
+## Compute the sensitivity
+sensitivity(y_hat, y)
+
+## Prevalence of females
+## My solution
+sum("Female" %in% y) / length(y)
+
+## Given solution
+mean(y == "Female")
